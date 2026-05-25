@@ -9,7 +9,9 @@ TRANSLATIONS = {
         "page_title": "📚 Plan de Lectură",
         "description": "Creează un plan personalizat pentru a termina cartea ta la timp!",
         "book_pages": "📖 Total pagini carte:",
-        "weeks": "📅 Număr de săptămâni:",
+        "total_weeks": "📅 Număr de săptămâni:",
+        "total_days": "📅 Număr de zile:",
+        "plan_by_weeks": "Planifică pe săptămâni",
         "days_per_week": "🗓️ Zile de citit pe săptămână:",
         "start_date": "🚀 Data de începere:",
         "reading_days": "📆 Zilele în care citești:",
@@ -53,7 +55,9 @@ TRANSLATIONS = {
         "page_title": "📚 Reading Planner",
         "description": "Create a personalized plan to finish your book on time!",
         "book_pages": "📖 Total book pages:",
-        "weeks": "📅 Number of weeks:",
+        "total_weeks": "📅 Number of weeks:",
+        "total_days": "📅 Number of days:",
+        "plan_by_weeks": "Plan by weeks",
         "days_per_week": "🗓️ Reading days per week:",
         "start_date": "🚀 Start date:",
         "reading_days": "📆 Days you'll read:",
@@ -250,11 +254,16 @@ def main() -> None:
 
     with col1:
         book_pages = st.number_input(t["book_pages"], min_value=1, value=300, step=1)
-        weeks = st.number_input(t["weeks"], min_value=1, value=4, step=1)
 
     with col2:
         start_date = st.date_input(t["start_date"], value=datetime.today())
         start_date = datetime.combine(start_date, datetime.min.time())
+
+    plan_by_weeks = st.toggle(label=t["plan_by_weeks"], value=True)
+    if plan_by_weeks:
+        num_weeks = st.number_input(t["total_weeks"], min_value=1, value=4, step=1)
+    else:
+        num_days = st.number_input(t["total_days"], min_value=1, value=30, step=1)
 
     # Day selection
     st.write(t["reading_days"])
@@ -293,7 +302,11 @@ def main() -> None:
 
         # Preview calculation
         days_per_week = len(selected_days)
-        total_reading_days = weeks * days_per_week
+        if plan_by_weeks:
+            total_reading_days = num_weeks * days_per_week
+        else:
+            total_reading_days = num_days
+
         preview_pages_distribution = calculate_pages_per_day(book_pages, total_reading_days, intensities, selected_days)
         preview_parts = []
 
@@ -310,50 +323,94 @@ def main() -> None:
             return
 
         days_per_week = len(selected_days)
-        total_reading_days = weeks * days_per_week
+        if plan_by_weeks:
+            total_reading_days = num_weeks * days_per_week
+        else:
+            total_reading_days = num_days
 
         # Calculate pages per day based on intensities
         pages_distribution = calculate_pages_per_day(book_pages, total_reading_days, intensities, selected_days)
 
         # Calculate average for display
         avg_pages_per_day = book_pages / total_reading_days
-        pages_per_week = book_pages / weeks
 
         # Generate actual reading dates
         reading_dates = generate_reading_dates(start_date, selected_days, total_reading_days)
 
         # Display goals
         st.success(f"{t['daily_goal']} **~{int(avg_pages_per_day)} {t['pages']}**")
-        st.info(f"{t['weekly_goal']} **{int(pages_per_week)} {t['pages']}**")
-
-        st.markdown(f"### {t['reading_plan']} {total_reading_days} {t['days']}")
 
         # Generate plan with actual dates
         day_index = 0
         pages_read = 0
 
-        for week in range(1, weeks + 1):
-            week_goal = (week / weeks) * book_pages
-            st.markdown(f"#### 📅 {t['week']} {week}/{weeks} — {t['to_page']} {int(week_goal)}")
+        if plan_by_weeks:
+            pages_per_week = book_pages / num_weeks
+            st.info(f"{t['weekly_goal']} **{int(pages_per_week)} {t['pages']}**")
+            st.markdown(f"### {t['reading_plan']} {total_reading_days} {t['days']}")
 
-            for _ in range(days_per_week):
-                if day_index < len(reading_dates):
-                    date = reading_dates[day_index]
-                    custom_weekday = (date.weekday() + 1) % 7
+            for week in range(1, num_weeks + 1):
+                week_goal = (week / num_weeks) * book_pages
+                st.markdown(f"#### 📅 {t['week']} {week}/{num_weeks} — {t['to_page']} {int(week_goal)}")
 
-                    # Add pages for this specific day based on intensity
-                    pages_for_day = pages_distribution[custom_weekday]
-                    pages_read += pages_for_day
+                for _ in range(days_per_week):
+                    if day_index < len(reading_dates):
+                        date = reading_dates[day_index]
+                        custom_weekday = (date.weekday() + 1) % 7
 
-                    formatted_date = format_date(date, lang, short_day=True)
+                        # Add pages for this specific day based on intensity
+                        pages_for_day = pages_distribution[custom_weekday]
+                        pages_read += pages_for_day
 
-                    # Intensity indicator (if different from 100%)
-                    intensity_emoji = " ⚡" if intensities[custom_weekday] != 100 else ""
+                        formatted_date = format_date(date, lang, short_day=True)
 
-                    st.write(f"{t['day']} {day_index + 1}/{total_reading_days}: {formatted_date} → **{t['to_page']} {math.ceil(pages_read)}{intensity_emoji}**")
-                    day_index += 1
+                        # Intensity indicator (if different from 100%)
+                        intensity_emoji = " ⚡" if intensities[custom_weekday] != 100 else ""
 
-            st.write("")
+                        st.write(f"{t['day']} {day_index + 1}/{total_reading_days}: {formatted_date} → **{t['to_page']} {math.ceil(pages_read)}{intensity_emoji}**")
+                        day_index += 1
+
+                st.write("")
+
+        else:
+            no_of_weeks = math.ceil(total_reading_days / days_per_week)
+            pages_per_week = book_pages / no_of_weeks
+            st.info(f"{t['weekly_goal']} **{int(pages_per_week)} {t['pages']}**")
+            st.markdown(f"### {t['reading_plan']} {total_reading_days} {t['days']}")
+
+            for week_index in range(1, no_of_weeks  + 1):
+                # Only show header if there are still days left to display
+                if day_index >= total_reading_days:
+                    break
+
+                days_in_this_week = min(days_per_week, total_reading_days - day_index)
+
+                temp_pages = pages_read
+                for i in range(days_in_this_week):
+                    temp_date = reading_dates[day_index + i]
+                    temp_weekday = (temp_date.weekday() + 1) % 7
+                    temp_pages += pages_distribution[temp_weekday]
+
+                st.markdown(f"#### 📅 {t['week']} {week_index}/{no_of_weeks} — {t['to_page']} {math.ceil(temp_pages)}")
+
+                for _ in range(days_in_this_week):
+                    if day_index < len(reading_dates):
+                        date = reading_dates[day_index]
+                        custom_weekday = (date.weekday() + 1) % 7
+
+                        # Add pages for this specific day based on intensity
+                        pages_for_day = pages_distribution[custom_weekday]
+                        pages_read += pages_for_day
+
+                        formatted_date = format_date(date, lang, short_day=True)
+
+                        # Intensity indicator (if different from 100%)
+                        intensity_emoji = " ⚡" if intensities[custom_weekday] != 100 else ""
+
+                        st.write(f"{t['day']} {day_index + 1}/{total_reading_days}: {formatted_date} → **{t['to_page']} {math.ceil(pages_read)}{intensity_emoji}**")
+                        day_index += 1
+
+                st.write("")
 
 
 if __name__ == "__main__":
